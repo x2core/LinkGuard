@@ -1,44 +1,43 @@
 <div align="center">
 
-# Tauri App Template
-
-English | [简体中文](./README.zh-CN.md)
+# Tauri Network Sniffer
 
 [![Tauri](https://img.shields.io/badge/Tauri-2.0-24C8DB?logo=tauri)](https://tauri.app/)
 [![React](https://img.shields.io/badge/React-19-61DAFB?logo=react)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.6-3178C6?logo=typescript)](https://www.typescriptlang.org/)
-[![License](https://img.shields.io/badge/License-MIT-green)](./LICENSE)
+[![Rust](https://img.shields.io/badge/Rust-1.70%2B-000000?logo=rust)](https://www.rust-lang.org/)
 
-A modern desktop application template built with Tauri v2 + React 19 + TypeScript + shadcn/ui.
+A lightweight, real-time desktop packet analyzer and network bandwidth monitor.
+Built with a high-performance Rust core utilizing Tauri, and a fluid, responsive user interface powered by TypeScript and modern frontend frameworks.
 
 </div>
 
-## Preview
+## Overview
 
-![App Screenshot](./screenshots/app.png)
+This application bridges low-level system networking with a high-level visual dashboard. It provides insights into active network sockets, protocol distributions, and data throughput without compromising system performance.
 
-## Features
+Currently, the application runs in a **high-velocity Mock Mode** to simulate gigabit network traffic safely without requiring root/administrative permissions or `libpcap` drivers.
 
-- ✨ **Modern Tech Stack** - Tauri v2 + React 19 + TypeScript + Vite
-- 🎨 **Beautiful UI Components** - Integrated shadcn/ui component library and Tailwind CSS v4
-- 🌓 **Dark Mode Support** - Built-in light/dark theme toggle
-- 🌍 **Internationalization** - i18next integration with English and Chinese support
-- 🖼️ **Custom Titlebar** - Frameless transparent window with drag, minimize, maximize, and close support
-- 🗂️ **Multi-Window Management** - Support for child windows, window lifecycle management, and delayed destruction
-- 🔔 **System Tray Integration** - Tray icon, menu, and window show/hide support
-- ⌨️ **Global Shortcuts** - Register global shortcuts that work even when app is not focused
-- 🔄 **Automated Release & Updates** - GitHub Actions build, GitHub Release publishing, and auto-update delivery based on `vX.Y.Z` tags
-- 📦 **Ready to Use** - Pre-configured with Prettier, ESLint, and TypeScript strict mode
-- 🚀 **Fast Development** - Vite HMR + Tauri hot reload
+## ⚙️ Technical Architecture & Data Flow
 
-## Tech Stack
+To handle high-velocity network traffic without freezing the user interface, the application separates concerns into a decoupled Producer-Consumer architecture using multi-threading.
 
-- **Desktop Framework**: [Tauri v2](https://tauri.app/)
-- **Frontend Framework**: [React 19](https://react.dev/) + [TypeScript](https://www.typescriptlang.org/)
-- **Build Tool**: [Vite](https://vite.dev/)
-- **UI Components**: [shadcn/ui](https://ui.shadcn.com/)
-- **Styling**: [Tailwind CSS v4](https://tailwindcss.com/)
-- **Code Formatting**: [Prettier](https://prettier.io/)
+1. **The Core (Rust Multi-threading):** The backend spawns a dedicated `tokio` worker thread that mocks listening to a network interface.
+2. **The Batching Buffer:** Capturing raw packets at Gigabit speeds generates thousands of events per second. Emitting an IPC event for every single packet would instantly crash the frontend UI thread. To solve this, the Rust backend implements a throttling/batching buffer that aggregates packet metadata every 100ms. Bandwidth throughput is also calculated purely on the Rust side and emitted every 1s.
+3. **The IPC Bridge (Tauri):** The aggregated batch is pushed to the frontend via asynchronous Tauri events (`tauri::Emitter`).
+4. **The UI Thread (TypeScript):** The frontend receives the lightweight JSON payload, updates a state management store, and renders the data using a virtualized list to maintain a constant 60 FPS, even with tens of thousands of rows.
+
+## 🛠️ Tech Stack & Mainstream Libraries
+
+### Backend (Rust)
+- **Tauri (v2):** The core framework used to build the cross-platform desktop application shell, providing secure, memory-efficient JS-to-Rust binding.
+- **Tokio:** The asynchronous runtime used to manage multi-threaded tasks, timers for the batching buffer, and non-blocking operations.
+- **Serde & Fastrand:** For fast struct-to-JSON serialization and mock data generation.
+
+### Frontend (TypeScript & UI)
+- **Shadcn UI & Tailwind CSS v4:** For building a polished, dark-themed, professional dashboard UI that mimics enterprise-level DevOps tooling.
+- **Recharts:** Utilized to render real-time, streaming Area charts representing upload/download speeds (Bytes/sec).
+- **TanStack Virtual:** A critical UI optimization library. Virtualized rendering ensures that only the visible rows of the massive packet log are mounted in the DOM.
 
 ## Getting Started
 
@@ -48,6 +47,8 @@ A modern desktop application template built with Tauri v2 + React 19 + TypeScrip
 - pnpm >= 9
 - Rust >= 1.70
 
+*(On Linux, you may need to install Tauri system dependencies such as `libglib2.0-dev`, `libwebkit2gtk-4.1-dev`, `librsvg2-dev`, and `patchelf`.)*
+
 ### Install Dependencies
 
 ```bash
@@ -55,6 +56,8 @@ pnpm install
 ```
 
 ### Development Mode
+
+Run the app in development mode with hot-reloading:
 
 ```bash
 pnpm tauri dev
@@ -66,126 +69,13 @@ pnpm tauri dev
 pnpm tauri build
 ```
 
-### Version Management
+## Usage
 
-`pnpm release:version` is the release entrypoint.
-
-```bash
-pnpm release:version
-pnpm release:version --lang zh
-pnpm release:version --lang en
-```
-
-It interactively handles the release preflight and version bump flow:
-- Ensures the working tree is clean
-- Requires the current branch to be `main`
-- Verifies `package.json`, `src-tauri/tauri.conf.json`, and `src-tauri/Cargo.toml` are in sync
-- Checks that the target tag does not already exist locally or on `origin`
-- Updates all three version files together
-- Creates the release commit and `vX.Y.Z` tag
-- Optionally pushes the branch and tag
-
-## Adding shadcn/ui Components
-
-```bash
-pnpm dlx shadcn@latest add <component-name>
-```
-
-Examples:
-
-```bash
-pnpm dlx shadcn@latest add button
-pnpm dlx shadcn@latest add input
-pnpm dlx shadcn@latest add dialog
-```
-
-## Code Formatting
-
-```bash
-pnpm format        # Format code
-pnpm format:check  # Check code formatting
-```
-
-## Project Structure
-
-```
-.
-├── src/                    # Frontend source code
-│   ├── components/         # React components
-│   │   └── ui/            # shadcn/ui components
-│   ├── i18n/              # Internationalization
-│   │   ├── index.ts       # i18n configuration
-│   │   └── locales/       # Translation files
-│   ├── lib/               # Utility functions
-│   ├── pages/             # Page components
-│   │   ├── home.tsx       # Main window page
-│   │   ├── about.tsx      # About window page
-│   │   └── settings.tsx   # Settings window page
-│   └── main.tsx           # Frontend entry and pathname-based page selector
-├── src-tauri/             # Tauri/Rust backend
-│   ├── src/               # Rust source code
-│   └── tauri.conf.json    # Tauri configuration
-├── docs/                  # Documentation
-│   ├── AUTO_UPDATE.md     # Auto update guide
-│   ├── I18N.md            # Internationalization guide
-│   └── GLOBAL_SHORTCUT.md # Global shortcut guide
-├── components.json        # shadcn/ui configuration
-└── package.json
-```
-
-## CI/CD
-
-This project uses GitHub Actions for automated builds and releases.
-
-### Automated Release
-
-The workflow is triggered by pushing tags matching `v*` (for example `v0.1.0`).
-The recommended release path is to run `pnpm release:version`, which creates the matching `vX.Y.Z` tag for you.
-
-**Manual tag push example:**
-```bash
-git tag v0.1.0
-git push origin v0.1.0
-```
-
-### Build Outputs
-
-The workflow generates:
-- **NSIS Installer** - Windows installation package
-- **Updater Files** - `latest.json` for auto-update support
-
-### Auto Update Setup
-
-To enable automatic updates, you need to:
-
-1. Generate signing keys: `pnpm tauri signer generate -w ~/.tauri/myapp.key`
-2. Add GitHub secrets: `TAURI_SIGNING_PRIVATE_KEY` and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`
-
-**Note:** The public key and update endpoint placeholders in `src-tauri/tauri.conf.json` are replaced by GitHub Actions during the release build. Auto update depends on the published GitHub Release exposing `latest.json` from the latest release assets.
-
-See [Auto Update Configuration](./docs/AUTO_UPDATE.md) for detailed instructions.
-
-### Code Signing (Optional)
-
-To enable code signing, add these secrets in your GitHub repository settings:
-- `TAURI_SIGNING_PRIVATE_KEY` - Private key content
-- `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` - Private key password
-
-The build will work without these secrets, but the installer won't be signed.
-
-### Multi-Platform Support
-
-To enable macOS and Linux builds, uncomment the corresponding platform configurations in `.github/workflows/release.yml`.
-
-## Recommended IDE Setup
-
-- [VS Code](https://code.visualstudio.com/)
-- [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode)
-- [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer)
-
-## Star History
-
-[![Star History Chart](https://api.star-history.com/svg?repos=kitlib/tauri-app-template&type=Date)](https://star-history.com/#kitlib/tauri-app-template&Date)
+1. Open the application.
+2. Select a mock network interface (e.g., `eth0`, `wlan0`) from the dropdown.
+3. Click the **Start** button.
+4. Watch the real-time bandwidth metrics populate the top chart, and observe the high-velocity packet log streaming into the virtualized table below.
+5. Click **Stop** to pause the capture, and use the **Trash** icon to clear the in-memory buffer.
 
 ## License
 
