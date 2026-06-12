@@ -1,150 +1,112 @@
-import { useState, useEffect } from "react";
-import reactLogo from "../assets/react.svg";
-import viteLogo from "../assets/vite.svg";
-import tauriLogo from "../assets/tauri.svg";
-import { invoke } from "@tauri-apps/api/core";
+import { useSniffer } from "@/hooks/useSniffer";
+import { BandwidthChart } from "@/components/dashboard/BandwidthChart";
+import { PacketLog } from "@/components/dashboard/PacketLog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { WindowFrame } from "@/components/window-frame";
-import { MainTitleBar } from "@/components/main-title-bar";
-import { UpdaterDialog } from "@/components/updater-dialog";
-import { listen } from "@tauri-apps/api/event";
-import { registerShortcut } from "@/lib/shortcut";
-import { toggleWindow } from "@/lib/window";
-import { useAppTranslation } from "@/hooks/use-app-translation";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Play, Square, Trash2, Activity } from "lucide-react";
 
-const SHORTCUT_KEY = "global-shortcut-show-main";
-
-export default function HomePage() {
-  const [greetMsg, setGreetMsg] = useState("");
-  const [name, setName] = useState("");
-  const { t } = useAppTranslation();
-
-  useEffect(() => {
-    // Listen for shortcut change events from settings window
-    const unlistenShortcutChanged = listen<{ shortcut: string }>(
-      "shortcut-changed",
-      async (event) => {
-        console.log("Shortcut changed event received:", event.payload.shortcut);
-        const newShortcut = event.payload.shortcut;
-        if (newShortcut) {
-          await registerShortcut(newShortcut, async () => {
-            await toggleWindow("main");
-          });
-        }
-      }
-    );
-
-    // Initialize tray menu with current language
-    const initTrayMenu = async () => {
-      try {
-        await invoke("update_tray_menu", {
-          showText: t("tray.show"),
-          quitText: t("tray.quit"),
-        });
-      } catch (error) {
-        console.error("Failed to initialize tray menu:", error);
-      }
-    };
-    initTrayMenu();
-
-    // Register global shortcut on app startup
-    const initShortcut = async () => {
-      const savedShortcut = localStorage.getItem(SHORTCUT_KEY);
-      if (savedShortcut) {
-        console.log("Registering saved shortcut:", savedShortcut);
-        await registerShortcut(savedShortcut, async () => {
-          await toggleWindow("main");
-        });
-      }
-    };
-    initShortcut();
-
-    return () => {
-      unlistenShortcutChanged.then((fn) => fn());
-    };
-  }, [t]);
-
-  async function greet() {
-    setGreetMsg(await invoke("greet", { name }));
-  }
+export default function Home() {
+  const {
+    interfaces,
+    selectedInterface,
+    setSelectedInterface,
+    isSniffing,
+    toggleSniffing,
+    packets,
+    metricsHistory,
+    clearPackets,
+  } = useSniffer();
 
   return (
-    <WindowFrame
-      titleBar={<MainTitleBar />}
-      contentClassName="container mx-auto flex flex-1 flex-col items-center justify-center gap-8 overflow-hidden p-8"
-    >
-      <UpdaterDialog />
-      <div className="flex flex-col items-center gap-4">
-        <h1 className="text-4xl font-bold tracking-tight">{t("app.welcome")}</h1>
-        <p className="text-muted-foreground">{t("app.description")}</p>
-      </div>
+    <div className="bg-background text-foreground flex h-screen flex-1 flex-col gap-6 overflow-hidden p-6">
+      <header className="flex shrink-0 items-center justify-between">
+        <div className="flex items-center gap-2">
+          <div className="bg-primary/20 rounded-lg p-2">
+            <Activity className="text-primary h-6 w-6" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Network Sniffer</h1>
+            <p className="text-muted-foreground text-sm">
+              Real-time packet inspection and bandwidth monitoring
+            </p>
+          </div>
+        </div>
 
-      <div className="flex items-center gap-8">
-        <a
-          href="https://vite.dev"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="transition-transform hover:scale-110"
-        >
-          <img src={viteLogo} className="h-24 w-24" alt="Vite logo" />
-        </a>
-        <a
-          href="https://tauri.app"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="transition-transform hover:scale-110"
-        >
-          <img src={tauriLogo} className="h-24 w-24" alt="Tauri logo" />
-        </a>
-        <a
-          href="https://react.dev"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="transition-transform hover:scale-110"
-        >
-          <img src={reactLogo} className="h-24 w-24" alt="React logo" />
-        </a>
-      </div>
-
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle>{t("greet.title")}</CardTitle>
-          <CardDescription>{t("greet.description")}</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form
-            className="flex gap-2"
-            onSubmit={(e) => {
-              e.preventDefault();
-              greet();
-            }}
+        <div className="flex items-center gap-4">
+          <Select
+            value={selectedInterface || undefined}
+            onValueChange={setSelectedInterface}
+            disabled={isSniffing || interfaces.length === 0}
           >
-            <Input
-              id="greet-input"
-              value={name}
-              onChange={(e) => setName(e.currentTarget.value)}
-              placeholder={t("greet.placeholder")}
-              className="flex-1"
-            />
-            <Button type="submit">{t("greet.button")}</Button>
-          </form>
-          {greetMsg && <p className="bg-muted mt-4 rounded-md p-3 text-sm">{greetMsg}</p>}
-        </CardContent>
-      </Card>
+            <SelectTrigger className="w-[200px]">
+              <SelectValue placeholder="Select Interface" />
+            </SelectTrigger>
+            <SelectContent>
+              {interfaces.map((iface) => (
+                <SelectItem key={iface} value={iface}>
+                  {iface}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
 
-      <div className="text-muted-foreground flex flex-wrap justify-center gap-4 text-sm">
-        <span>React 19</span>
-        <span>•</span>
-        <span>TypeScript</span>
-        <span>•</span>
-        <span>Tailwind CSS v4</span>
-        <span>•</span>
-        <span>shadcn/ui</span>
-        <span>•</span>
-        <span>Tauri v2</span>
-      </div>
-    </WindowFrame>
+          <Button
+            onClick={toggleSniffing}
+            variant={isSniffing ? "destructive" : "default"}
+            className="w-32"
+            disabled={!selectedInterface}
+          >
+            {isSniffing ? (
+              <>
+                <Square className="mr-2 h-4 w-4" />
+                Stop
+              </>
+            ) : (
+              <>
+                <Play className="mr-2 h-4 w-4" />
+                Start
+              </>
+            )}
+          </Button>
+
+          <Button variant="outline" size="icon" onClick={clearPackets} title="Clear Log">
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
+      </header>
+
+      <main className="flex flex-1 flex-col gap-6 overflow-hidden">
+        <div className="shrink-0">
+          <BandwidthChart data={metricsHistory} />
+        </div>
+        <div className="min-h-0 flex-1">
+          <PacketLog packets={packets} />
+        </div>
+      </main>
+
+      {/* Global styles for custom scrollbar within this scope */}
+      <style>{`
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 8px;
+          height: 8px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: hsl(var(--muted-foreground) / 0.3);
+          border-radius: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: hsl(var(--muted-foreground) / 0.5);
+        }
+      `}</style>
+    </div>
   );
 }
