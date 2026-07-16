@@ -1,3 +1,4 @@
+pub mod dpi;
 pub mod models;
 
 use std::sync::atomic::{AtomicBool, Ordering};
